@@ -1,87 +1,113 @@
-# UEFN Code Review — VS Code Extension
+# 🚀 UEFN Code Review — VS Code Extension
 
-Selecciona código en VS Code, presiona un atajo y se postea a Slack con un pre-review de IA opcional.
+A VS Code extension designed specifically for Unreal Editor for Fortnite (UEFN) development teams. It replaces the manual workflow of "copying code, pasting into Slack, and manually typing context" with a fast, standardized keyboard shortcut.
 
-## Características
+**The Goal:** A code review should take 30 seconds to send and 30 seconds to review.
 
-- Atajo `Cmd/Ctrl + Shift + R` sobre selección activa.
-- Post a Slack vía Incoming Webhook (sin backend, sin servidor).
-- Pre-review IA opcional con Google Gemini (free tier: 1500 req/día).
-- Lee `.verse-style.md` del workspace y lo usa como autoridad para el pre-review.
-- Aprobación vía reacciones de Slack: ✅ aprobar, 🔁 cambios, 👀 revisando.
-- Credenciales en SecretStorage de VS Code (cifrado nativo, no en `settings.json`).
+## ✨ Key Features
 
-## Instalación (modo dev)
+- **Frictionless Workflow:** `Cmd/Ctrl + Shift + R` shortcut on your active selection.
+- **Git Auto-Detection:** Automatically computes the diff against the Git HEAD (perfect for coexisting with Unreal Revision Control - URC).
+- **Multi-Snippet Sessions:** Groups changes from multiple files into a single structured review message.
+- **AI Pre-review (Google Gemini):** Analyzes code for anti-patterns and bugs before a human reviewer sees it.
+- **Living Style Guide:** Reads the `.verse-style.md` file from the workspace and uses it as the strict authority for the AI.
+- **Slack Integration (Two Modes):**
+  - *Bot Token (Recommended):* Keeps the channel clean by posting the main metadata and grouping all AI feedback into a **thread**.
+  - *Incoming Webhook:* Simple mode with AI feedback inline in the main message.
+- **Quick Approvals:** Via native Slack reactions (✅ approve, 🔁 request changes, 👀 reviewing).
+- **Native Security:** Credentials are saved in VS Code's `SecretStorage` (native encryption, nothing in plain text).
+
+---
+
+## 📚 Team Documentation Hub
+
+If you are part of the studio and looking for how to use this tool in your daily workflow, check out our internal guides (included in this repository):
+
+1. 📖 [GUIA_EQUIPO.md](./GUIA_EQUIPO.md) — Mandatory reading. How to make effective reviews, golden rules, and how to read diffs.
+2. 🔀 [URC_Y_GIT.md](./URC_Y_GIT.md) — How Git and URC coexist (Clipboard Route vs. Git Route).
+3. 🔄 [UPDATE.md](./UPDATE.md) — Release notes and changelog (v0.2.7+).
+
+---
+
+## 🛠️ Installation and Setup (Users)
+
+### 1. Install the Extension
+You can compile it locally or install the `.vsix` package distributed by the team:
 
 ```bash
-cd extension
+code --install-extension uefn-code-review-0.2.7.vsix --force
+```
+
+### 2. Configure Credentials
+
+- In VS Code, open the Command Palette (Cmd/Ctrl + Shift + P) and run:
+
+Code Review: Configure Credentials
+
+- It will ask you to choose between Bot Token mode (Threads) or Webhook mode. You will need:
+
+- The Slack Token or Webhook URL (provided by the Lead).
+
+- Your Google Gemini API Key (free via AI Studio).
+
+- Your author name.
+
+### 3. Configure Workspace (settings.json)
+Open your user settings in VS Code and add this block to standardize the options across the studio:
+
+```bash
+JSON
+{
+  "uefnCodeReview.geminiModel": "gemini-2.5-flash",
+  "uefnCodeReview.useGitForOldCode": true,
+  "uefnCodeReview.diffContextLines": 3,
+  "uefnCodeReview.projects": [
+    "RH", "HH2", "HH3", "DnD", "R&D", "Otro"
+  ],
+  "uefnCodeReview.reviewTypes": [
+    "Bug Fixed", "Bug", "New Feature", "Refactor", "Hotfix", "Code Review", "Question"
+  ],
+  "uefnCodeReview.author": "Your Name Here"
+}
+```
+
+💻 Local Development (Maintainers)
+
+If you want to modify the extension or compile a new version:
+
+1. Environment Setup
+Clone this repository and install dependencies:
+
+Bash
 npm install
 npm run compile
-```
 
-Para empaquetar:
+2. Code Structure
 
-```bash
-npm run package    # genera uefn-code-review-0.1.0.vsix
-```
 
-Instalar el `.vsix`:
 
-```bash
-code --install-extension uefn-code-review-0.1.0.vsix
-```
-
-O en VS Code: `Extensions → ⋯ → Install from VSIX...`
-
-## Configuración inicial
-
-Una vez instalada, abre la paleta (`Cmd+Shift+P`) y corre:
-
-```
-Code Review: Configure Credentials
-```
-
-Te pedirá:
-1. **Slack Incoming Webhook URL** — ver `../SETUP.md` para crearla.
-2. **Gemini API Key** — opcional, ver `../SETUP.md`. Deja vacío para deshabilitar IA.
-3. **Tu nombre** — se mostrará como autor en Slack.
-
-## Uso
-
-1. Selecciona código en cualquier archivo `.verse` o `.py`.
-2. Presiona `Cmd+Shift+R` (o `Ctrl+Shift+R` en Windows/Linux).
-3. Opcionalmente describe el contexto (Enter sin texto si no aplica).
-4. La extensión corre el pre-review IA (si está habilitado) y postea a Slack.
-
-Para enviar saltándote la IA: paleta → `Code Review: Send for Code Review (skip AI pre-review)`.
-
-## Estructura
-
-```
-extension/
-├── package.json           # Manifest VS Code (commands, keybindings, settings)
+Code-Review-Verse/
+├── package.json           # VS Code Manifest (commands, keybindings, settings)
 ├── tsconfig.json
+├── .verse-style.md        # Canonical style guide for the studio
+├── GUIA_EQUIPO.md         # Usage documentation
+├── URC_Y_GIT.md           # Version control flows documentation
 └── src/
-    ├── extension.ts       # Activación + comandos
-    ├── slack.ts           # Block Kit + POST a webhook
-    ├── gemini.ts          # Llamada a Gemini con responseSchema
-    ├── styleGuide.ts      # Lee .verse-style.md del workspace
-    ├── prompts.ts         # System prompts por lenguaje
-    └── types.ts
-```
+    ├── extension.ts       # Activation + command registration
+    ├── diff.ts            # Diff logic, LCS, and hunk extension (v0.2.7+)
+    ├── gemini.ts          # Google Gemini API integration
+    ├── originalContent.ts # Fetches HEAD from Git or Clipboard
+    ├── prompts.ts         # System prompts injected into the AI
+    ├── session.ts         # Multi-snippet session management in memory
+    ├── slack.ts           # Block Kit UI and POST to Slack (Bot Token & Webhook)
+    ├── statusBar.ts       # UI for the pending reviews bottom widget
+    ├── styleGuide.ts      # Reads the .verse-style.md from the workspace
+    └── types.ts           # TypeScript interfaces and types
 
-## Settings disponibles
+3. Package a New Version
 
-| Key                                  | Default                  | Descripción                                |
-|--------------------------------------|--------------------------|--------------------------------------------|
-| `uefnCodeReview.author`              | `""`                     | Nombre mostrado en Slack                   |
-| `uefnCodeReview.enableAiPreReview`   | `true`                   | Toggle global del pre-review IA            |
-| `uefnCodeReview.styleGuidePath`      | `.verse-style.md`        | Path relativo al workspace para Verse      |
-| `uefnCodeReview.geminiModel`         | `gemini-2.0-flash-exp`   | Modelo Gemini a usar                       |
+To generate the .vsix file for distribution:
 
-## Roadmap
-
-- [ ] Soporte para `.python-style.md`
-- [ ] Comando "diff against last commit" (cuando se integre con URC)
-- [ ] Selector de canal de Slack (múltiples webhooks)
-- [ ] Métricas locales: cuántos reviews por dev, severidad promedio
+Bash
+npm run package
+This will generate a uefn-code-review-x.x.x.vsix file in the root directory, ready to be shared.
