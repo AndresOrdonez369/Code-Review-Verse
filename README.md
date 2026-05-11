@@ -35,7 +35,7 @@ If you are part of the studio and looking for how to use this tool in your daily
 You can compile it locally or install the `.vsix` package distributed by the team:
 
 ```bash
-code --install-extension uefn-code-review-0.2.7.vsix --force
+code --install-extension uefn-code-review-0.2.8.vsix --force
 ```
 
 ### 2. Configure Credentials
@@ -66,26 +66,26 @@ JSON
   ],
   "uefnCodeReview.reviewTypes": [
     "Bug Fixed", "Bug", "New Feature", "Refactor", "Hotfix", "Code Review", "Question"
-  ],
+  ],GIT AD
   "uefnCodeReview.author": "Your Name Here"
 }
 ```
 
-💻 Local Development (Maintainers)
+## 💻 Local Development (Maintainers)
 
 If you want to modify the extension or compile a new version:
 
-1. Environment Setup
+### 1. Environment Setup
 Clone this repository and install dependencies:
 
 Bash
 npm install
 npm run compile
 
-2. Code Structure
+### 2. Code Structure
 
 
-
+```bash
 Code-Review-Verse/
 ├── package.json           # VS Code Manifest (commands, keybindings, settings)
 ├── tsconfig.json
@@ -94,7 +94,7 @@ Code-Review-Verse/
 ├── URC_Y_GIT.md           # Version control flows documentation
 └── src/
     ├── extension.ts       # Activation + command registration
-    ├── diff.ts            # Diff logic, LCS, and hunk extension (v0.2.7+)
+    ├── diff.ts            # Diff logic, LCS, and hunk extension (v0.2.8+)
     ├── gemini.ts          # Google Gemini API integration
     ├── originalContent.ts # Fetches HEAD from Git or Clipboard
     ├── prompts.ts         # System prompts injected into the AI
@@ -103,11 +103,14 @@ Code-Review-Verse/
     ├── statusBar.ts       # UI for the pending reviews bottom widget
     ├── styleGuide.ts      # Reads the .verse-style.md from the workspace
     └── types.ts           # TypeScript interfaces and types
+```
 
-3. Package a New Version
+### 3. Package a New Version
 
 To generate the .vsix file for distribution:
 
-Bash
+```bash
 npm run package
+```
+
 This will generate a uefn-code-review-x.x.x.vsix file in the root directory, ready to be shared.
