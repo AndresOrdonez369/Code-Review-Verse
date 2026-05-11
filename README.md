@@ -78,9 +78,10 @@ If you want to modify the extension or compile a new version:
 ### 1. Environment Setup
 Clone this repository and install dependencies:
 
-Bash
+```bash
 npm install
 npm run compile
+```
 
 ### 2. Code Structure
 
@@ -114,3 +115,21 @@ npm run package
 ```
 
 This will generate a uefn-code-review-x.x.x.vsix file in the root directory, ready to be shared.
+
+## 🐛 Troubleshooting & Support
+- The shortcut Ctrl+Shift+R does nothing? Ensure you have an active text selection in your .verse or .py file before triggering the command.
+
+- AI Pre-review failed? Open the VS Code Output Panel (Ctrl+Shift+U) and select UEFN Code Review from the dropdown menu to see detailed logs. This is usually caused by an invalid/expired API key or hitting the rate limit.
+
+- Diff shows the entire file as green (+)? You likely haven't committed your base file to Git. Run git add . && git commit -m "baseline" to establish your HEAD.
+
+## 🗺️ Roadmap
+[ ] Full support for Python (.python-style.md).
+
+[ ] Local developer metrics (average severity, reviews sent per sprint).
+
+[ ] Direct integration with URC API (if Epic Games exposes it in the future).
+
+## 🤝 Contributing & Feedback
+
+This tool is actively maintained to improve our studio's workflow. If you encounter bugs, have feature requests, or want to suggest a new rule for the .verse-style.md, please reach out to Andres O. via DM on Slack or open a discussion in the repository.
