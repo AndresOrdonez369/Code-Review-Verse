@@ -25,7 +25,7 @@ If you are part of the studio and looking for how to use this tool in your daily
 
 1. 📖 [GUIA_EQUIPO.md](./GUIA_EQUIPO.md) — Mandatory reading. How to make effective reviews, golden rules, and how to read diffs.
 2. 🔀 [URC_Y_GIT.md](./URC_Y_GIT.md) — How Git and URC coexist (Clipboard Route vs. Git Route).
-3. 🔄 [UPDATE.md](./UPDATE.md) — Release notes and changelog (v0.2.7+).
+3. 🔄 [UPDATE.md](./UPDATE.md) — Release notes and changelog (v0.2.9+).
 
 ---
 
