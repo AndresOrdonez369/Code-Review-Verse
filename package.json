@@ -4,6 +4,10 @@
   "description": "Multi-snippet code reviews to Slack with auto-Git diff, threaded AI feedback, and Gemini pre-review",
   "version": "0.2.9",
   "publisher": "uefn-team",
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/AndresOrdonez369/Code-Review-Verse.git"
+},
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Linters"],
   "extensionDependencies": ["vscode.git"],
