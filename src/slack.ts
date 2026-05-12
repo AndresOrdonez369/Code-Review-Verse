@@ -1,6 +1,7 @@
 import * as https from 'https';
 import { URL } from 'url';
 import { unifiedDiff, diffStats, countDiffPrefixes } from './diff';
+import { renderDiffPng, renderCodePng } from './diffImage';
 import type {
   ReviewSession,
   ReviewMetadata,
@@ -58,8 +59,8 @@ async function sendViaWebhook(
   metadata: ReviewMetadata,
   diffStyle: DiffStyle
 ): Promise<void> {
-  // Webhook posts everything inline (no thread support)
-  const blocks = buildAllBlocks(session, metadata, diffStyle, true);
+  // Webhook posts everything inline (no thread support, no file uploads).
+  const blocks = buildAllBlocks(session, metadata, diffStyle, true, new Map());
   const fallbackText = `[${metadata.project}] [${metadata.type}] ${metadata.title}`;
   const body = JSON.stringify({ text: fallbackText, blocks });
 
@@ -107,8 +108,12 @@ async function sendViaBotToken(
   metadata: ReviewMetadata,
   diffStyle: DiffStyle
 ): Promise<void> {
+  // 0. Render each snippet's diff to a PNG and upload to Slack.
+  // Best-effort: any failure falls back to the text ```diff``` block.
+  const images = await uploadSnippetImages(botToken, session, diffStyle);
+
   // 1. Main message: header + metadata + diffs (NO AI inline)
-  const mainBlocks = buildAllBlocks(session, metadata, diffStyle, false);
+  const mainBlocks = buildAllBlocks(session, metadata, diffStyle, false, images);
   const fallbackText = `[${metadata.project}] [${metadata.type}] ${metadata.title}`;
 
   const mainTs = await postChatMessage(botToken, {
@@ -249,7 +254,8 @@ function buildAllBlocks(
   session: ReviewSession,
   m: ReviewMetadata,
   diffStyle: DiffStyle,
-  inlineAi: boolean
+  inlineAi: boolean,
+  images: Map<string, string>
 ): unknown[] {
   const blocks: unknown[] = [];
 
@@ -330,7 +336,8 @@ function buildAllBlocks(
       i + 1,
       session.snippets.length,
       diffStyle,
-      inlineAi
+      inlineAi,
+      images.get(snippet.id)
     );
 
     if (i < session.snippets.length - 1) {
@@ -371,7 +378,8 @@ function pushSnippetBlocks(
   index: number,
   total: number,
   diffStyle: DiffStyle,
-  inlineAi: boolean
+  inlineAi: boolean,
+  fileId: string | undefined
 ): void {
   const { added, removed } = snippetStats(s);
   const stats = added + removed > 0 ? `  ·  *+${added} -${removed}*` : '';
@@ -391,7 +399,14 @@ function pushSnippetBlocks(
     });
   }
 
-  if (s.diffText) {
+  // Image path (bot-token mode + successful PNG upload)
+  if (fileId) {
+    blocks.push({
+      type: 'image',
+      slack_file: { id: fileId },
+      alt_text: `Diff for ${s.filename} (lines ${s.startLine}-${s.endLine})`,
+    });
+  } else if (s.diffText) {
     blocks.push({
       type: 'section',
       text: {
@@ -529,4 +544,173 @@ function buildAiThreadBlocks(session: ReviewSession): unknown[] {
   }
 
   return blocks;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File upload (PNG diffs)  —  bot token mode only
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Renders each snippet's diff to a PNG and uploads it to Slack. Returns a
+ * map of snippet.id → file_id. Snippets whose render or upload fails are
+ * silently omitted from the map (caller falls back to ```diff``` text).
+ */
+async function uploadSnippetImages(
+  botToken: string,
+  session: ReviewSession,
+  diffStyle: DiffStyle
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const s of session.snippets) {
+    try {
+      const png = renderSnippetPng(s, diffStyle);
+      if (!png) continue;
+      const fileId = await uploadPng(botToken, png, `snippet-${s.id}.png`, s);
+      out.set(s.id, fileId);
+    } catch (err) {
+      // Best-effort: any failure leaves this snippet to fall back to text.
+      console.error(`[uefn-code-review] image upload failed for snippet ${s.id}:`, err);
+    }
+  }
+  return out;
+}
+
+function renderSnippetPng(s: Snippet, diffStyle: DiffStyle): Buffer | null {
+  if (s.diffText) return renderDiffPng(s.diffText);
+  if (s.oldCode && s.oldCode.length > 0) {
+    if (diffStyle === 'unified') return renderDiffPng(unifiedDiff(s.oldCode, s.newCode));
+    // side-by-side: render the diff anyway (image is more compact than two blocks)
+    return renderDiffPng(unifiedDiff(s.oldCode, s.newCode));
+  }
+  return renderCodePng(s.newCode);
+}
+
+/**
+ * Slack 3-step external upload:
+ *   1. files.getUploadURLExternal → upload_url + file_id
+ *   2. POST the bytes to upload_url
+ *   3. files.completeUploadExternal → finalize (no channel share; the
+ *      image block in the main message will share it implicitly)
+ */
+async function uploadPng(
+  botToken: string,
+  bytes: Buffer,
+  filename: string,
+  s: Snippet
+): Promise<string> {
+  const { uploadUrl, fileId } = await getUploadUrl(botToken, filename, bytes.length);
+  await putBytes(uploadUrl, bytes);
+  await completeUpload(botToken, fileId, `${s.filename} L${s.startLine}-${s.endLine}`);
+  return fileId;
+}
+
+async function getUploadUrl(
+  botToken: string,
+  filename: string,
+  length: number
+): Promise<{ uploadUrl: string; fileId: string }> {
+  const params = new URLSearchParams({ filename, length: String(length) }).toString();
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'slack.com',
+        path: '/api/files.getUploadURLExternal?' + params,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${botToken}` },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          let parsed: any;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            reject(new Error(`getUploadURLExternal: non-JSON response: ${data.substring(0, 200)}`));
+            return;
+          }
+          if (!parsed.ok) {
+            reject(new Error(`getUploadURLExternal: ${parsed.error || 'unknown'}`));
+            return;
+          }
+          resolve({ uploadUrl: parsed.upload_url, fileId: parsed.file_id });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function putBytes(uploadUrl: string, bytes: Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let url: URL;
+    try {
+      url = new URL(uploadUrl);
+    } catch {
+      reject(new Error('Invalid upload_url from Slack'));
+      return;
+    }
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': bytes.length,
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) resolve();
+          else reject(new Error(`upload_url POST failed ${res.statusCode}: ${data.substring(0, 200)}`));
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(bytes);
+    req.end();
+  });
+}
+
+function completeUpload(botToken: string, fileId: string, title: string): Promise<void> {
+  const payload = JSON.stringify({ files: [{ id: fileId, title }] });
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'slack.com',
+        path: '/api/files.completeUploadExternal',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${botToken}`,
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          let parsed: any;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            reject(new Error(`completeUploadExternal: non-JSON response: ${data.substring(0, 200)}`));
+            return;
+          }
+          if (!parsed.ok) {
+            reject(new Error(`completeUploadExternal: ${parsed.error || 'unknown'}`));
+            return;
+          }
+          resolve();
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
