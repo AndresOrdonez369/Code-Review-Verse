@@ -51,6 +51,8 @@ Más simple, menos cosas que mantener. URC sigue siendo el único VCS.
 
 Más rápida pero requiere disciplina. Git vive **paralelo** a URC, no lo reemplaza.
 
+Instala Git en tu PC (descarga "64-bit Git for Windows" desde [git-scm.com](https://git-scm.com/download/win)).
+
 **Setup:**
 1. En la raíz del proyecto:
    ```powershell
