@@ -18,6 +18,21 @@ Es una extensión de VS Code que reemplaza el flujo manual de "copiar código, p
 
 ## Setup inicial (una vez por persona)
 
+### 1. Elegir tu flujo de versiones (Con Git o Sin Git)
+
+Dado que nuestro proyecto usa **URC (Unreal Revision Control)** como fuente de verdad principal, tienes dos opciones para que la extensión compare tu código nuevo con el viejo. Elige la que prefieras:
+
+**Ruta A: Sin Git (Vía Portapapeles - Recomendada para empezar)**
+
+No necesitas instalar nada extra. URC sigue siendo tu único sistema. Cuando vayas a hacer review, simplemente copiarás el código viejo desde la vista de diff de URC en VS Code y la extensión lo usará.
+
+* *Setup:* Más adelante, en el Paso 5, te asegurarás de apagar la opción de Git en tus settings.
+
+**Ruta B: Con Git (Auto-detección)**
+Git vive en paralelo a URC solo en tu máquina para detectar los cambios automáticamente sin copiar y pegar.
+
+1. Instala Git en tu PC (descarga "64-bit Git for Windows" desde [git-scm.com](https://git-scm.com/download/win)).
+
 ### 1. Tener Git en tu repo de UEFN
 
 Abre PowerShell en la carpeta raíz de tu proyecto UEFN (la que contiene `Plugins/`, `Content/`, etc.):
